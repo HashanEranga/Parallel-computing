@@ -198,7 +198,7 @@ Defines a point in the program and say "all threads must arrive here before any 
 ```
 Please Note that the big_cal1 and big_cal2 must be big calculations. Since A array will be used in the next calculation therefore need to put up a barrier there.  
 
-### Critical Section Construct (Thiss will be used for mutual exclusion)
+### Critical Section Construct (This will be used for mutual exclusion)
 When move along the program if one occurs a critical section it will be done only one thread will be allowed. 
 ```C
 #pragma omp parallel 
@@ -230,3 +230,85 @@ Certain constructs presents in the hardware give quick updates of values in memo
 }
 ```
 The statement inside the atomic must be one of the following forms. x binops=expr, x++, x--, ++x, --x
+
+### Critical Implementation for pi program
+```C
+#include <omp.h>
+#include <stdio.h>
+#define NUM_THREADS 4
+
+int main(){
+    unsigned long nsteps = 1<<27; 
+    double dx = 1.0 / nsteps;
+    double pi = 0.0;
+    double start_time = omp_get_wtime();
+    unsigned long i;
+    int mainThreads;
+
+    omp_set_num_threads(NUM_THREADS);
+
+    #pragma omp parallel 
+    {
+        int i, id, subThreads;
+        double x, sum = 0.0;
+        id = omp_get_thread_num();
+        subThreads = omp_get_num_threads();
+        if(id == 0) mainThreads = subThreads;
+
+        for(int i=id; i< nsteps; i = i+subThreads){
+            x = (i + 0.5) * dx;
+            sum += 4.0 / (1.0 + x * x);
+        } 
+
+        #pragma omp critical 
+            pi += sum * dx;
+
+    }
+
+    double delta = omp_get_wtime() - start_time;
+
+    printf("PI = %.16g computed in %.4g seconds with %d threads.", pi, delta, NUM_THREADS);
+}
+
+```
+
+### Atomic Solution for pi program
+```C
+#include <omp.h>
+#include <stdio.h>
+#define NUM_THREADS 64
+
+int main(){
+    unsigned long nsteps = 1<<27; 
+    double dx = 1.0 / nsteps;
+    double pi = 0.0;
+    double start_time = omp_get_wtime();
+    unsigned long i;
+    int mainThreads;
+
+    omp_set_num_threads(NUM_THREADS);
+
+    #pragma omp parallel 
+    {
+        int i, id, subThreads;
+        double x, sum = 0.0;
+        id = omp_get_thread_num();
+        subThreads = omp_get_num_threads();
+        if(id == 0) mainThreads = subThreads;
+
+        for(int i=id; i< nsteps; i = i+subThreads){
+            x = (i + 0.5) * dx;
+            sum += 4.0 / (1.0 + x * x);
+        } 
+        sum = sum * dx;
+        #pragma omp atomic 
+            pi += sum;
+
+    }
+
+    double delta = omp_get_wtime() - start_time;
+
+    printf("PI = %.16g computed in %.4g seconds with %d threads.", pi, delta, NUM_THREADS);
+}
+
+```
